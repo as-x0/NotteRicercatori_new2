@@ -1,9 +1,13 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const fs = require("fs");
-const csv = require("csv-parser");
-const path = require("path");
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import fs from "fs";
+import csv from "csv-parser";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -20,7 +24,7 @@ let products = new Set();
 let years = new Set();
 let countries = new Set();
 
-fs.createReadStream("data/FAOSTAT_data.csv")
+fs.createReadStream(path.join(__dirname, "data/FAOSTAT_data.csv"))
   .pipe(csv())
   .on("data", (row) => {
     const area = row.Area?.trim();
@@ -42,12 +46,11 @@ fs.createReadStream("data/FAOSTAT_data.csv")
   });
 
 // ======== Gestione stanze ========
-let rooms = {}; // roomId -> { players, status, product, year, numCountries }
+let rooms = {};
 
 io.on("connection", (socket) => {
   console.log(`🔌 Nuova connessione: ${socket.id}`);
 
-  // Creazione stanza (manager)
   socket.on("createRoom", ({ roomId, product, year, numCountries }) => {
     rooms[roomId] = {
       players: {},
@@ -61,29 +64,23 @@ io.on("connection", (socket) => {
     socket.emit("roomCreated", roomId);
   });
 
-  // Manager chiede lista prodotti
   socket.on("getProducts", () => {
     socket.emit("productsList", Array.from(products).sort());
   });
 
-  // Giocatore entra nella stanza
   socket.on("joinRoom", ({ roomId, name }) => {
     const room = rooms[roomId];
     if (room && room.status === "waiting") {
       room.players[socket.id] = { name, countries: [] };
       socket.join(roomId);
       io.to(roomId).emit("playerList", Object.values(room.players));
-
-      // Invia lista paesi per autocomplete solo a questo giocatore
       socket.emit("countriesList", Array.from(countries).sort());
-
       console.log(`👤 ${name} è entrato nella stanza ${roomId}`);
     } else {
       socket.emit("errorMsg", "Stanza non trovata o partita già iniziata");
     }
   });
 
-  // Manager inizia la partita
   socket.on("startGame", (roomId) => {
     const room = rooms[roomId];
     if (room) {
@@ -97,7 +94,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Giocatore invia paese scelto
   socket.on("submitCountry", ({ roomId, country }) => {
     const room = rooms[roomId];
     if (!room || room.status !== "started") return;
@@ -105,7 +101,6 @@ io.on("connection", (socket) => {
     const player = room.players[socket.id];
     if (!player) return;
 
-    // Controllo massimo numCountries
     if (player.countries.length < room.numCountries && countries.has(country)) {
       if (!player.countries.includes(country)) {
         player.countries.push(country);
@@ -119,7 +114,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Disconnessione
   socket.on("disconnect", () => {
     for (const roomId in rooms) {
       const room = rooms[roomId];
@@ -132,7 +126,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// ======== Avvio server ========
 server.listen(PORT, () => {
   console.log(`🌐 Server in ascolto su http://localhost:${PORT}`);
 });
