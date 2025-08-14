@@ -1,25 +1,74 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Gestore - FAOSTAT Game</title>
+  <meta charset="UTF-8">
+  <title>FAOSTAT Game - Gestore</title>
   <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    select, input, button { padding: 5px; margin: 5px; }
+  </style>
 </head>
 <body>
   <h1>Gestore</h1>
-  <div id="setup">
-    <label>Prodotto: <input id="product"></label>
-    <label>Numero Paesi: <input id="numCountries" type="number" value="3"></label>
-    <button onclick="createRoom()">Crea Partita</button>
-  </div>
-
-  <div id="room" style="display:none;">
+  <button id="createRoomBtn">Crea Stanza</button>
+  <div id="roomInfo" style="display:none;">
     <p>Codice stanza: <span id="roomId"></span></p>
-    <h3>Giocatori:</h3>
-    <ul id="players"></ul>
-    <button onclick="startGame()">Avvia</button>
-    <button onclick="endGame()">Termina</button>
+    <label>Prodotto:
+      <select id="productSelect"></select>
+    </label>
+    <label>Anno:
+      <select id="yearSelect"></select>
+    </label>
+    <label>Numero di Paesi:
+      <input type="number" id="numCountries" min="1" value="3">
+    </label>
+    <button id="setSettingsBtn">Imposta</button>
+    <button id="startGameBtn">Inizia Partita</button>
+
+    <h3>Giocatori connessi</h3>
+    <ul id="playerList"></ul>
   </div>
 
-  <script src="script.js"></script>
+  <script>
+    const socket = io();
+
+    const createRoomBtn = document.getElementById("createRoomBtn");
+    const roomInfo = document.getElementById("roomInfo");
+    const roomIdSpan = document.getElementById("roomId");
+    const productSelect = document.getElementById("productSelect");
+    const yearSelect = document.getElementById("yearSelect");
+    const numCountriesInput = document.getElementById("numCountries");
+    const playerListEl = document.getElementById("playerList");
+
+    let currentRoomId = null;
+
+    createRoomBtn.onclick = () => {
+      socket.emit("createRoom");
+    };
+
+    socket.on("roomCreated", ({ roomId, products, years }) => {
+      currentRoomId = roomId;
+      roomIdSpan.textContent = roomId;
+      roomInfo.style.display = "block";
+      productSelect.innerHTML = products.map(p => `<option>${p}</option>`).join("");
+      yearSelect.innerHTML = years.map(y => `<option>${y}</option>`).join("");
+    });
+
+    document.getElementById("setSettingsBtn").onclick = () => {
+      const product = productSelect.value;
+      const year = yearSelect.value;
+      const numCountries = parseInt(numCountriesInput.value, 10);
+      socket.emit("setSettings", { roomId: currentRoomId, product, year, numCountries });
+    };
+
+    document.getElementById("startGameBtn").onclick = () => {
+      socket.emit("startGame", currentRoomId);
+    };
+
+    socket.on("playerList", (players) => {
+      playerListEl.innerHTML = players.map(p => `<li>${p.name} (${p.countries.length} paesi)</li>`).join("");
+    });
+  </script>
 </body>
 </html>
