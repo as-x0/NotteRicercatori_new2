@@ -21,7 +21,7 @@ app.use(express.static(path.join(__dirname, "/public")));
 
 // Lettura CSV
 const productsData = [];
-const csvPath = path.join(__dirname, "FAOSTAT_data_en_8.10-2025.csv");
+const csvPath = path.join(__dirname, "FAOSTAT_data_en_8-10-2025.csv");
 
 fs.createReadStream(csvPath)
   .on("error", (err) => {
