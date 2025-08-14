@@ -94,6 +94,10 @@ io.on("connection", (socket) => {
   });
 });
 
+app.get("/", (req, res) => {
+  res.redirect("/manager.html");
+});
+
 httpServer.listen(3000, () => {
   console.log("Server avviato su http://localhost:3000");
 });
