@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Giocatore - FAOSTAT Game</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h1>Giocatore</h1>
+  <div id="join">
+    <label>Codice stanza: <input id="joinRoomId"></label>
+    <label>Nome: <input id="playerName"></label>
+    <button onclick="joinRoom()">Entra</button>
+  </div>
+
+  <div id="game" style="display:none;">
+    <h3>Inserisci paesi:</h3>
+    <input id="countries" placeholder="Italia, Francia, Spagna">
+    <button onclick="submitCountries()">Invia</button>
+  </div>
+
+  <div id="results" style="display:none;">
+    <h3>Classifica:</h3>
+    <ul id="leaderboard"></ul>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
