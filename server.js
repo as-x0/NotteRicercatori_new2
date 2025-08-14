@@ -24,7 +24,7 @@ let products = new Set();
 let years = new Set();
 let countries = new Set();
 
-fs.createReadStream(path.join(__dirname, "data/FAOSTAT_data_en_8.10-2025.csv"))
+fs.createReadStream(path.join(__dirname, "FAOSTAT_data_en_8.10-2025.csv"))
   .pipe(csv())
   .on("data", (row) => {
     const area = row.Area?.trim();
