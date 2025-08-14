@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gestore - FAOSTAT Game</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h1>Gestore</h1>
+  <div id="setup">
+    <label>Prodotto: <input id="product"></label>
+    <label>Numero Paesi: <input id="numCountries" type="number" value="3"></label>
+    <button onclick="createRoom()">Crea Partita</button>
+  </div>
+
+  <div id="room" style="display:none;">
+    <p>Codice stanza: <span id="roomId"></span></p>
+    <h3>Giocatori:</h3>
+    <ul id="players"></ul>
+    <button onclick="startGame()">Avvia</button>
+    <button onclick="endGame()">Termina</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
