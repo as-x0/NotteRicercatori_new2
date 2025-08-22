@@ -1,73 +1,79 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
   <meta charset="UTF-8">
-  <title>FAOSTAT Game - Gestore</title>
+  <title>FAOSTAT Game - Manager</title>
   <script src="/socket.io/socket.io.js"></script>
-  <style>
-    body { font-family: sans-serif; padding: 20px; }
-    select, input, button { padding: 5px; margin: 5px; }
-  </style>
 </head>
 <body>
-  <h1>Gestore</h1>
-  <button id="createRoomBtn">Crea Stanza</button>
+  <h1>Manager</h1>
+  <button id="createRoom">Crea stanza</button>
   <div id="roomInfo" style="display:none;">
-    <p>Codice stanza: <span id="roomId"></span></p>
-    <label>Prodotto:
-      <select id="productSelect"></select>
-    </label>
-    <label>Anno:
-      <select id="yearSelect"></select>
-    </label>
-    <label>Numero di Paesi:
-      <input type="number" id="numCountries" min="1" value="3">
-    </label>
-    <button id="setSettingsBtn">Imposta</button>
-    <button id="startGameBtn">Inizia Partita</button>
+    <p>ID Stanza: <span id="roomId"></span></p>
+    <h3>Impostazioni gioco</h3>
+    <label>Prodotto: <select id="productSelect"></select></label><br>
+    <label>Anno: <select id="yearSelect"></select></label><br>
+    <label>Numero Paesi: <input type="number" id="numCountries" value="5" min="1"></label><br>
+    <button id="saveSettings">Salva impostazioni</button>
+    <button id="startGame">Avvia Gioco</button>
 
-    <h3>Giocatori connessi</h3>
+    <h3>Giocatori</h3>
     <ul id="playerList"></ul>
   </div>
+
+  <h3>Risultati</h3>
+  <div id="results"></div>
 
   <script>
     const socket = io();
 
-    const createRoomBtn = document.getElementById("createRoomBtn");
+    const createBtn = document.getElementById("createRoom");
     const roomInfo = document.getElementById("roomInfo");
     const roomIdSpan = document.getElementById("roomId");
     const productSelect = document.getElementById("productSelect");
     const yearSelect = document.getElementById("yearSelect");
-    const numCountriesInput = document.getElementById("numCountries");
-    const playerListEl = document.getElementById("playerList");
+    const numCountries = document.getElementById("numCountries");
+    const saveBtn = document.getElementById("saveSettings");
+    const startBtn = document.getElementById("startGame");
+    const playerList = document.getElementById("playerList");
+    const resultsDiv = document.getElementById("results");
 
     let currentRoomId = null;
 
-    createRoomBtn.onclick = () => {
+    createBtn.onclick = () => {
       socket.emit("createRoom");
+    };
+
+    saveBtn.onclick = () => {
+      socket.emit("setSettings", {
+        roomId: currentRoomId,
+        product: productSelect.value,
+        year: yearSelect.value,
+        numCountries: parseInt(numCountries.value)
+      });
+    };
+
+    startBtn.onclick = () => {
+      socket.emit("startGame", currentRoomId);
     };
 
     socket.on("roomCreated", ({ roomId, products, years }) => {
       currentRoomId = roomId;
       roomIdSpan.textContent = roomId;
       roomInfo.style.display = "block";
+
+      // popola select prodotti/anni
       productSelect.innerHTML = products.map(p => `<option>${p}</option>`).join("");
       yearSelect.innerHTML = years.map(y => `<option>${y}</option>`).join("");
     });
 
-    document.getElementById("setSettingsBtn").onclick = () => {
-      const product = productSelect.value;
-      const year = yearSelect.value;
-      const numCountries = parseInt(numCountriesInput.value, 10);
-      socket.emit("setSettings", { roomId: currentRoomId, product, year, numCountries });
-    };
-
-    document.getElementById("startGameBtn").onclick = () => {
-      socket.emit("startGame", currentRoomId);
-    };
-
     socket.on("playerList", (players) => {
-      playerListEl.innerHTML = players.map(p => `<li>${p.name} (${p.countries.length} paesi)</li>`).join("");
+      playerList.innerHTML = players.map(p => `<li>${p.name} - ${p.country || "Nessun paese scelto"}</li>`).join("");
+    });
+
+    socket.on("gameEnded", (players) => {
+      resultsDiv.innerHTML = "<h4>Classifica:</h4>" +
+        players.map(p => `<div>${p.name} - ${p.points} punti</div>`).join("");
     });
   </script>
 </body>
