@@ -1,70 +1,75 @@
-// server.js
 import express from "express";
-import http from "http";
-import { Server } from "socket.io";
-import fs from "fs";
-import csv from "csv-parser";
-import path from "path";
-import { fileURLToPath } from "url";
+socket.on("selectCountry", ({ roomId, country }) => {
+const room = rooms[roomId];
+if (!room) return socket.emit("errorMsg", "Stanza non trovata");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const player = room.players.find((p) => p.id === socket.id);
+if (!player) return socket.emit("errorMsg", "Giocatore non in stanza");
 
-const PORT = process.env.PORT || 3000;
 
-// Servire file statici
-app.use(express.static(path.join(__dirname, "/public")));
+if (!room.settings.product || !room.settings.year) return socket.emit("errorMsg", "Il gestore non ha ancora impostato le impostazioni");
 
-// Lettura CSV
-const productsData = [];
-const csvPath = path.join(__dirname, "FAOSTAT_data_en_8-10-2025.csv");
 
-fs.createReadStream(csvPath)
-  .on("error", (err) => {
-    console.error("Errore apertura CSV:", err);
-  })
-  .pipe(csv())
-  .on("data", (row) => {
-    // row dovrebbe avere: Product, Country, ExportValue
-    productsData.push(row);
-  })
-  .on("end", () => {
-    console.log("CSV caricato, righe:", productsData.length);
-  });
+const available = countriesFor(room.settings.product, room.settings.year).filter((c) => !room.usedCountries.has(c));
 
-// Endpoint API per il manager: lista prodotti unici
-app.get("/api/products", (req, res) => {
-  const products = [...new Set(productsData.map((p) => p.Product))];
-  res.json(products);
+
+if (!available.includes(country)) return socket.emit("errorMsg", "Paese non disponibile");
+
+
+const limit = Number(room.settings.numCountries) || 3;
+if (player.countries.length >= limit) return socket.emit("errorMsg", `Hai già selezionato ${limit} paesi`);
+
+
+player.countries.push(country);
+room.usedCountries.add(country);
+
+
+emitPlayerList(roomId);
+emitCountriesList(roomId);
 });
 
-// Endpoint API per il player: autocomplete dei paesi
-app.get("/api/countries", (req, res) => {
-  const countries = [...new Set(productsData.map((p) => p.Country))];
-  res.json(countries);
+
+socket.on("endGame", (roomId) => {
+const room = rooms[roomId];
+if (!room) return socket.emit("errorMsg", "Stanza non trovata");
+if (room.manager !== socket.id) return socket.emit("errorMsg", "Solo il gestore può terminare la partita");
+
+
+const { product, year } = room.settings;
+const leaderboard = room.players.map((p) => {
+const score = p.countries.reduce((sum, c) => sum + getExportValue(product, c, year), 0);
+p.score = score;
+return { name: p.name, score };
 });
 
-// Socket.IO gestione gioco
-io.on("connection", (socket) => {
-  console.log("Nuovo client connesso:", socket.id);
 
-  socket.on("playerAnswer", (data) => {
-    // data: { product, country, value }
-    console.log("Risposta ricevuta:", data);
-    // Puoi implementare logica punteggio qui
-    io.emit("updateScore", data);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnesso:", socket.id);
-  });
+leaderboard.sort((a, b) => b.score - a.score);
+io.to(roomId).emit("gameEnded", leaderboard);
 });
+
+
+socket.on("disconnect", () => {
+// Rimuovi il player da eventuale stanza
+for (const [roomId, room] of Object.entries(rooms)) {
+const idx = room.players.findIndex((p) => p.id === socket.id);
+if (idx !== -1) {
+room.players.splice(idx, 1);
+emitPlayerList(roomId);
+}
+if (room.manager === socket.id) {
+// Se si disconnette il manager, chiudi stanza
+io.to(roomId).emit("errorMsg", "Il gestore si è disconnesso. Stanza chiusa.");
+delete rooms[roomId];
+}
+}
+console.log("👋 Client disconnesso:", socket.id);
+});
+});
+
 
 // Avvio server
-server.listen(PORT, () => {
-  console.log(`Server attivo su http://localhost:${PORT}`);
+server.listen(PORT, async () => {
+try { await loadCSV(); } catch (e) {}
+console.log(`Server attivo su http://localhost:${PORT}`);
 });
