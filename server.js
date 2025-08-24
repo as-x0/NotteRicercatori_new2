@@ -27,7 +27,7 @@ let csvLoaded = false;
 const csvPath = path.join(__dirname, "FAOSTAT_data_it.csv");
 
 fs.createReadStream(csvPath)
-  .pipe(csv({ separator: ";" }))
+  .pipe(csv({ separator: "," }))
   .on("data", (row) => {
     // Salva solo righe valide
     if (row["Item"] && row["Area"] && row["Year"] && row["Value"]) {
