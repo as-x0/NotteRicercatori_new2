@@ -4,6 +4,16 @@
   <meta charset="UTF-8">
   <title>FAOSTAT Game - Player</title>
   <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f9fafb; padding:20px; }
+    h1 { color:#065f46; }
+    input { padding:8px; margin:5px; border-radius:6px; border:1px solid #ccc; }
+    button { background:#059669; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; margin:5px; }
+    button:hover { background:#047857; }
+    #results { margin-top:20px; }
+    canvas { max-width:600px; margin-top:20px; }
+  </style>
 </head>
 <body>
   <h1>Player</h1>
@@ -12,10 +22,15 @@
   <button id="joinRoom">Entra</button>
 
   <div id="gameArea" style="display:none;">
-    <h3>Scegli un paese</h3>
-    <select id="countrySelect"></select>
-    <button id="chooseCountry">Scegli</button>
+    <h3>Scegli i tuoi Paesi</h3>
+    <div id="countriesInputs"></div>
+    <button id="submitCountries">Invia Scelte</button>
   </div>
+
+  <h3>Risultati</h3>
+  <div id="results"></div>
+  <canvas id="chart"></canvas>
+  <button id="backHome" style="display:none;">Torna alla Home Player</button>
 
   <script>
     const socket = io();
@@ -23,10 +38,14 @@
     const roomIdInput = document.getElementById("roomId");
     const joinBtn = document.getElementById("joinRoom");
     const gameArea = document.getElementById("gameArea");
-    const countrySelect = document.getElementById("countrySelect");
-    const chooseBtn = document.getElementById("chooseCountry");
-
+    const countriesInputsDiv = document.getElementById("countriesInputs");
+    const submitBtn = document.getElementById("submitCountries");
+    const resultsDiv = document.getElementById("results");
+    const backHome = document.getElementById("backHome");
+    let chartInstance = null;
     let currentRoomId = null;
+    let allCountries = [];
+    let numCountriesRequired = 3;
 
     joinBtn.onclick = () => {
       const name = playerName.value.trim();
@@ -36,18 +55,58 @@
       socket.emit("joinRoom", { roomId, name });
     };
 
-    chooseBtn.onclick = () => {
-      const country = countrySelect.value;
-      if (!country) return alert("Seleziona un paese!");
-      socket.emit("selectCountry", { roomId: currentRoomId, country });
+    submitBtn.onclick = () => {
+      const countries = [];
+      for(let i=0;i<numCountriesRequired;i++){
+        const val = document.getElementById(`country${i}`).value.trim();
+        if(val) countries.push(val);
+      }
+      if(countries.length !== numCountriesRequired) return alert("Compila tutti i campi!");
+      socket.emit("submitCountries", { roomId: currentRoomId, countries });
     };
 
-    socket.on("gameStarted", () => {
+    backHome.onclick = () => window.location.href = "/index.html";
+
+    socket.on("gameStarted", (settings) => {
+      numCountriesRequired = settings.numCountries;
       gameArea.style.display = "block";
+      countriesInputsDiv.innerHTML = "";
+      for(let i=0;i<numCountriesRequired;i++){
+        const input = document.createElement("input");
+        input.setAttribute("id", `country${i}`);
+        input.setAttribute("list", "countriesList");
+        input.placeholder = `Paese ${i+1}`;
+        countriesInputsDiv.appendChild(input);
+      }
+      const datalist = document.createElement("datalist");
+      datalist.id = "countriesList";
+      allCountries.forEach(c => {
+        const option = document.createElement("option");
+        option.value = c;
+        datalist.appendChild(option);
+      });
+      countriesInputsDiv.appendChild(datalist);
     });
 
     socket.on("countriesList", (countries) => {
-      countrySelect.innerHTML = countries.map(c => `<option>${c}</option>`).join("");
+      allCountries = countries;
+    });
+
+    socket.on("gameEnded", ({ leaderboard, top5, product }) => {
+      resultsDiv.innerHTML = "<h4>Classifica:</h4>" +
+        leaderboard.map(p => `<div>${p.name} - ${p.score} punti</div>`).join("");
+      backHome.style.display = "inline-block";
+
+      const labels = top5.map(t => t.country);
+      const values = top5.map(t => t.value);
+
+      if(chartInstance) chartInstance.destroy();
+      const ctx = document.getElementById("chart").getContext("2d");
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: `Export ${product} (2023)`, data: values }] },
+        options: { responsive:true, plugins:{ legend:{ display:false } } }
+      });
     });
   </script>
 </body>
