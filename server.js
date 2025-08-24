@@ -1,8 +1,8 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const fs = require("fs");
-const csv = require("csv-parser");
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import fs from "fs";
+import csv from "csv-parser";
 
 const app = express();
 const server = http.createServer(app);
