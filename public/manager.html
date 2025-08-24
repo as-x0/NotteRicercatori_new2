@@ -79,7 +79,7 @@
     currentRoomId = roomId;
     roomIdSpan.textContent = roomId;
     roomSection.style.display = "block";
-    productSelect.innerHTML = products.map(p => `<option>${p}</option>`).join("");
+    productSelect.innerHTML = products.map(p => `<option value="${p}">${p}</option>`).join("");
   });
 
   socket.on("playerList", (players) => {
