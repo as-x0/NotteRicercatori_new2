@@ -10,7 +10,7 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
-// --- Traduzioni prodotti in italiano ---
+// Traduzioni prodotti in italiano
 const productTranslations = {
   "Wheat": "Grano",
   "Rice": "Riso",
@@ -27,9 +27,9 @@ const productTranslations = {
   "Bananas": "Banane"
 };
 
-// --- Caricamento CSV FAOSTAT ---
+// Caricamento CSV FAOSTAT
 let productsData = [];
-fs.createReadStream("FAOSTAT_data_it.csv")
+fs.createReadStream("data/FAOSTAT_data.csv")
   .pipe(csv())
   .on("data", (row) => {
     productsData.push({
@@ -44,17 +44,16 @@ fs.createReadStream("FAOSTAT_data_it.csv")
     console.log("✅ CSV caricato, prodotti disponibili:", productsData.length);
   });
 
-// --- Stanze e stato gioco ---
+// Stanze di gioco
 let rooms = {};
 
-// --- Socket.IO ---
 io.on("connection", (socket) => {
   console.log("🔗 Nuovo client connesso:", socket.id);
 
-  // Creazione stanza (solo se CSV caricato)
+  // Creazione stanza
   socket.on("createRoom", () => {
     if (productsData.length === 0) {
-      socket.emit("errorMsg", "⚠️ I dati non sono ancora pronti, attendi qualche secondo e riprova.");
+      socket.emit("errorMsg", "⚠️ I dati non sono pronti, attendi qualche secondo.");
       return;
     }
 
@@ -62,12 +61,11 @@ io.on("connection", (socket) => {
     rooms[roomId] = { manager: socket.id, players: [], settings: null, started: false };
     socket.join(roomId);
 
-    const products = [...new Set(productsData.map((p) => p.ProductIT))].filter(Boolean);
-
+    const products = [...new Set(productsData.map(p => p.ProductIT))].filter(Boolean);
     socket.emit("roomCreated", { roomId, products });
   });
 
-  // Impostazioni gioco
+  // Salvataggio impostazioni
   socket.on("setSettings", ({ roomId, product, year, numCountries }) => {
     if (!rooms[roomId]) return;
     rooms[roomId].settings = { product, year, numCountries };
@@ -86,7 +84,7 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("playerList", rooms[roomId].players);
   });
 
-  // Giocatore chiede lista paesi
+  // Giocatore richiede lista paesi
   socket.on("requestCountries", () => {
     const countries = [...new Set(productsData.map(p => p.Country))].sort();
     socket.emit("countryList", countries);
@@ -101,20 +99,33 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("playerList", rooms[roomId].players);
   });
 
-  // Avvio partita
+  // Avvio gioco
   socket.on("startGame", (roomId) => {
-    if (rooms[roomId]) {
-      rooms[roomId].started = true;
-      io.to(roomId).emit("gameStarted", rooms[roomId].settings);
+    const room = rooms[roomId];
+    if (!room) return;
+
+    if (!room.settings) {
+      socket.emit("errorMsg", "⚠️ Salva prima le impostazioni del gioco prima di avviarlo!");
+      return;
     }
+
+    room.started = true;
+    io.to(roomId).emit("gameStarted", room.settings);
   });
 
-  // Fine partita e calcolo punteggi
+  // Fine gioco
   socket.on("endGame", (roomId) => {
     const room = rooms[roomId];
     if (!room) return;
 
+    if (!room.settings) {
+      socket.emit("errorMsg", "⚠️ Salva prima le impostazioni del gioco prima di terminarlo!");
+      return;
+    }
+
     const { product, year } = room.settings;
+
+    // Calcolo punteggi
     room.players.forEach(player => {
       let score = 0;
       player.countries.forEach(country => {
@@ -148,10 +159,10 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("playerList", rooms[roomId].players);
     }
   });
+
 });
 
-// --- Avvio server ---
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🚀 Server avviato su http://localhost:${PORT}`);
+  console.log(`🚀 Server attivo su http://localhost:${PORT}`);
 });
