@@ -16,14 +16,12 @@
     <button id="joinBtn">Entra</button>
   </div>
 
-  <!-- Sezione scelta paesi -->
   <div id="gameSection" style="display:none;">
     <h3>Scegli i tuoi paesi</h3>
     <form id="countriesForm"></form>
     <button id="submitCountries">Conferma scelte</button>
   </div>
 
-  <!-- Risultati -->
   <div id="resultsSection" style="display:none;">
     <h3>Risultati</h3>
     <ul id="resultsList"></ul>
@@ -46,7 +44,6 @@
   let numCountries = 3;
   let countryList = [];
 
-  // Entrata del giocatore
   joinBtn.addEventListener("click", () => {
     const name = playerNameInput.value.trim();
     const roomId = roomIdInput.value.trim();
@@ -55,20 +52,17 @@
     socket.emit("joinRoom", { roomId, name });
   });
 
-  // Ricezione impostazioni dal manager
   socket.on("gameStarted", (settings) => {
     numCountries = settings.numCountries;
     gameSection.style.display = "block";
     socket.emit("requestCountries");
   });
 
-  // Riceviamo lista paesi dal server
   socket.on("countryList", (countries) => {
     countryList = countries;
     renderCountryInputs();
   });
 
-  // Render input con datalist
   function renderCountryInputs() {
     countriesForm.innerHTML = "";
     for (let i = 0; i < numCountries; i++) {
@@ -88,7 +82,6 @@
     document.body.appendChild(dataList);
   }
 
-  // Invio scelte al server
   submitCountriesBtn.addEventListener("click", () => {
     const inputs = countriesForm.querySelectorAll("input[name='country']");
     const chosen = [...inputs].map(i => i.value.trim()).filter(Boolean);
@@ -100,12 +93,10 @@
     gameSection.style.display = "none";
   });
 
-  // Risultati finali
   socket.on("gameEnded", ({ players, topCountries }) => {
     resultsSection.style.display = "block";
     resultsList.innerHTML = players.map(p => `<li>${p.name}: ${p.score}</li>`).join("");
 
-    // Disegno grafico top 5 paesi
     const ctx = document.getElementById("resultsChart").getContext("2d");
     new Chart(ctx, {
       type: "bar",
@@ -119,10 +110,7 @@
     });
   });
 
-  // Messaggi di errore
-  socket.on("errorMsg", (msg) => {
-    alert(msg);
-  });
+  socket.on("errorMsg", (msg) => alert(msg));
 </script>
 </body>
 </html>
