@@ -86,6 +86,7 @@ io.on("connection", (socket) => {
 
   // Giocatore richiede lista paesi
   socket.on("requestCountries", () => {
+    if (!productsData.length) return;
     const countries = [...new Set(productsData.map(p => p.Country))].sort();
     socket.emit("countryList", countries);
   });
