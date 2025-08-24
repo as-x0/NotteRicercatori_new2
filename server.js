@@ -24,7 +24,7 @@ app.use(express.static(path.join(__dirname, "public")));
 const productsData = [];
 let csvLoaded = false;
 
-const csvPath = path.join(__dirname, "FAOSTAT_data_en_8-10-2025.csv");
+const csvPath = path.join(__dirname, "FAOSTAT_data_it.csv");
 
 fs.createReadStream(csvPath)
   .pipe(csv({ separator: ";" }))
