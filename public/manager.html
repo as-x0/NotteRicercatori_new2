@@ -5,52 +5,61 @@
   <title>Manager FAOSTAT Game</title>
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1, h3 { color: #2c3e50; }
+    button { margin: 5px 0; padding: 5px 10px; }
+    select, input { margin: 5px 0; padding: 5px; }
+    #playerList li { margin-bottom: 3px; }
+  </style>
 </head>
 <body>
-  <h1>Manager</h1>
+<h1>Manager</h1>
 
-  <!-- Sezione creazione stanza -->
-  <div id="createSection">
-    <button id="createRoomBtn">Crea stanza</button>
-  </div>
+<!-- Sezione creazione stanza -->
+<div id="createSection">
+  <button id="createRoomBtn">Crea stanza</button>
+</div>
 
-  <!-- Sezione impostazioni -->
-  <div id="roomSection" style="display:none;">
-    <p>ID Stanza: <span id="roomIdSpan"></span></p>
+<!-- Sezione stanza -->
+<div id="roomSection" style="display:none;">
+  <p>ID Stanza: <span id="roomIdSpan"></span></p>
 
-    <h3>Impostazioni gioco</h3>
-    <label>Prodotto:
-      <select id="productSelect"></select>
-    </label>
-    <p>Anno: 2023</p>
-    <label>Numero Paesi:</label>
-    <input type="radio" name="numCountries" value="3" checked> 3
-    <input type="radio" name="numCountries" value="5"> 5
-    <br><br>
-    <button id="saveSettingsBtn">Salva impostazioni</button>
-    <button id="startGameBtn">Avvia Gioco</button>
+  <h3>Impostazioni gioco</h3>
+  <label>Prodotto:
+    <select id="productSelect"></select>
+  </label>
+  <p>Anno: 2023</p>
+  <label>Numero Paesi:</label>
+  <input type="radio" name="numCountries" value="3" checked> 3
+  <input type="radio" name="numCountries" value="5"> 5
+  <br><br>
+  <button id="saveSettingsBtn">Salva impostazioni</button>
+  <button id="startGameBtn">Avvia Gioco</button>
+  <button id="endGameBtn">Termina Gioco</button>
 
-    <h3>Giocatori</h3>
-    <ul id="playerList"></ul>
+  <h3>Giocatori</h3>
+  <ul id="playerList"></ul>
 
-    <button id="endGameBtn" style="margin-top:20px;">Termina Gioco</button>
-
-    <h3>Risultati</h3>
-    <ul id="resultsList"></ul>
-    <canvas id="resultsChart"></canvas>
-    <button onclick="window.location.reload()">Torna alla Home</button>
-  </div>
+  <h3>Risultati</h3>
+  <ul id="resultsList"></ul>
+  <canvas id="resultsChart"></canvas>
+  <br>
+  <button onclick="window.location.reload()">Torna alla Home</button>
+</div>
 
 <script>
+document.addEventListener("DOMContentLoaded", () => {
   const socket = io();
+
   const createRoomBtn = document.getElementById("createRoomBtn");
   const roomSection = document.getElementById("roomSection");
   const roomIdSpan = document.getElementById("roomIdSpan");
   const productSelect = document.getElementById("productSelect");
   const saveSettingsBtn = document.getElementById("saveSettingsBtn");
   const startGameBtn = document.getElementById("startGameBtn");
-  const playerList = document.getElementById("playerList");
   const endGameBtn = document.getElementById("endGameBtn");
+  const playerList = document.getElementById("playerList");
   const resultsList = document.getElementById("resultsList");
 
   let currentRoomId = null;
@@ -65,6 +74,7 @@
     const numCountries = parseInt(document.querySelector('input[name="numCountries"]:checked').value);
     settings = { product, year: 2023, numCountries };
     socket.emit("setSettings", { roomId: currentRoomId, ...settings });
+    alert("Impostazioni salvate!");
   });
 
   startGameBtn.addEventListener("click", () => {
@@ -75,18 +85,27 @@
     socket.emit("endGame", currentRoomId);
   });
 
+  // Evento stanza creata
   socket.on("roomCreated", ({ roomId, products }) => {
-    console.log("Prodotti ricevuti dal server:", products);
+    console.log("RoomCreated ricevuto:", roomId, products); // DEBUG
     currentRoomId = roomId;
     roomIdSpan.textContent = roomId;
     roomSection.style.display = "block";
-    productSelect.innerHTML = products.map(p => `<option>${p}</option>`).join("");
+
+    if (products.length === 0) {
+      alert("❌ Nessun prodotto disponibile nel CSV!");
+      return;
+    }
+
+    productSelect.innerHTML = products.map(p => `<option value="${p}">${p}</option>`).join("");
   });
 
+  // Lista giocatori aggiornata
   socket.on("playerList", (players) => {
     playerList.innerHTML = players.map(p => `<li>${p.name} - ${p.countries.join(", ") || "Nessuna scelta"}</li>`).join("");
   });
 
+  // Risultati e grafico
   socket.on("gameEnded", ({ players, topCountries }) => {
     resultsList.innerHTML = players.map(p => `<li>${p.name}: ${p.score}</li>`).join("");
     const ctx = document.getElementById("resultsChart").getContext("2d");
@@ -96,13 +115,16 @@
         labels: topCountries.map(c => c.Country),
         datasets: [{
           label: `Esportazioni ${settings.product} 2023`,
-          data: topCountries.map(c => c.Value)
+          data: topCountries.map(c => c.Value),
+          backgroundColor: 'rgba(54, 162, 235, 0.6)'
         }]
-      }
+      },
+      options: { responsive: true, plugins: { legend: { display: false } } }
     });
   });
 
   socket.on("errorMsg", (msg) => alert(msg));
+});
 </script>
 </body>
 </html>
