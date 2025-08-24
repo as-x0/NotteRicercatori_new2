@@ -2,112 +2,127 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <title>FAOSTAT Game - Player</title>
+  <title>Player</title>
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; background:#f9fafb; padding:20px; }
-    h1 { color:#065f46; }
-    input { padding:8px; margin:5px; border-radius:6px; border:1px solid #ccc; }
-    button { background:#059669; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer; margin:5px; }
-    button:hover { background:#047857; }
-    #results { margin-top:20px; }
-    canvas { max-width:600px; margin-top:20px; }
-  </style>
 </head>
 <body>
-  <h1>Player</h1>
-  <label>Nome: <input type="text" id="playerName"></label><br>
-  <label>Room ID: <input type="text" id="roomId"></label><br>
-  <button id="joinRoom">Entra</button>
-
-  <div id="gameArea" style="display:none;">
-    <h3>Scegli i tuoi Paesi</h3>
-    <div id="countriesInputs"></div>
-    <button id="submitCountries">Invia Scelte</button>
+  <div id="joinSection">
+    <h2>Player</h2>
+    <label>Nome:</label>
+    <input type="text" id="playerName">
+    <label>Room ID:</label>
+    <input type="text" id="roomIdInput">
+    <button id="joinBtn">Entra</button>
   </div>
 
-  <h3>Risultati</h3>
-  <div id="results"></div>
-  <canvas id="chart"></canvas>
-  <button id="backHome" style="display:none;">Torna alla Home Player</button>
+  <!-- Sezione scelta paesi -->
+  <div id="gameSection" style="display:none;">
+    <h3>Scegli i tuoi paesi</h3>
+    <form id="countriesForm"></form>
+    <button id="submitCountries">Conferma scelte</button>
+  </div>
 
-  <script>
-    const socket = io();
-    const playerName = document.getElementById("playerName");
-    const roomIdInput = document.getElementById("roomId");
-    const joinBtn = document.getElementById("joinRoom");
-    const gameArea = document.getElementById("gameArea");
-    const countriesInputsDiv = document.getElementById("countriesInputs");
-    const submitBtn = document.getElementById("submitCountries");
-    const resultsDiv = document.getElementById("results");
-    const backHome = document.getElementById("backHome");
-    let chartInstance = null;
-    let currentRoomId = null;
-    let allCountries = [];
-    let numCountriesRequired = 3;
+  <!-- Risultati -->
+  <div id="resultsSection" style="display:none;">
+    <h3>Risultati</h3>
+    <ul id="resultsList"></ul>
+    <canvas id="resultsChart"></canvas>
+    <button onclick="window.location.reload()">Torna alla Home</button>
+  </div>
 
-    joinBtn.onclick = () => {
-      const name = playerName.value.trim();
-      const roomId = roomIdInput.value.trim();
-      if (!name || !roomId) return alert("Inserisci nome e Room ID!");
-      currentRoomId = roomId;
-      socket.emit("joinRoom", { roomId, name });
-    };
+<script>
+  const socket = io();
+  const joinBtn = document.getElementById("joinBtn");
+  const playerNameInput = document.getElementById("playerName");
+  const roomIdInput = document.getElementById("roomIdInput");
+  const gameSection = document.getElementById("gameSection");
+  const countriesForm = document.getElementById("countriesForm");
+  const submitCountriesBtn = document.getElementById("submitCountries");
+  const resultsSection = document.getElementById("resultsSection");
+  const resultsList = document.getElementById("resultsList");
 
-    submitBtn.onclick = () => {
-      const countries = [];
-      for(let i=0;i<numCountriesRequired;i++){
-        const val = document.getElementById(`country${i}`).value.trim();
-        if(val) countries.push(val);
+  let currentRoomId = null;
+  let numCountries = 3;
+  let countryList = [];
+
+  // Entrata del giocatore
+  joinBtn.addEventListener("click", () => {
+    const name = playerNameInput.value.trim();
+    const roomId = roomIdInput.value.trim();
+    if (!name || !roomId) return alert("Inserisci nome e Room ID");
+    currentRoomId = roomId;
+    socket.emit("joinRoom", { roomId, name });
+  });
+
+  // Ricezione impostazioni dal manager
+  socket.on("gameStarted", (settings) => {
+    numCountries = settings.numCountries;
+    gameSection.style.display = "block";
+    socket.emit("requestCountries");
+  });
+
+  // Riceviamo lista paesi dal server
+  socket.on("countryList", (countries) => {
+    countryList = countries;
+    renderCountryInputs();
+  });
+
+  // Render input con datalist
+  function renderCountryInputs() {
+    countriesForm.innerHTML = "";
+    for (let i = 0; i < numCountries; i++) {
+      const input = document.createElement("input");
+      input.setAttribute("list", "countries");
+      input.name = "country";
+      input.placeholder = "Inserisci un Paese";
+      countriesForm.appendChild(input);
+      countriesForm.appendChild(document.createElement("br"));
+    }
+
+    let dataList = document.getElementById("countries");
+    if (dataList) dataList.remove();
+    dataList = document.createElement("datalist");
+    dataList.id = "countries";
+    dataList.innerHTML = countryList.map(c => `<option value="${c}">`).join("");
+    document.body.appendChild(dataList);
+  }
+
+  // Invio scelte al server
+  submitCountriesBtn.addEventListener("click", () => {
+    const inputs = countriesForm.querySelectorAll("input[name='country']");
+    const chosen = [...inputs].map(i => i.value.trim()).filter(Boolean);
+    if (chosen.length !== numCountries) {
+      alert(`Devi scegliere esattamente ${numCountries} paesi`);
+      return;
+    }
+    socket.emit("chooseCountries", { roomId: currentRoomId, countries: chosen });
+    gameSection.style.display = "none";
+  });
+
+  // Risultati finali
+  socket.on("gameEnded", ({ players, topCountries }) => {
+    resultsSection.style.display = "block";
+    resultsList.innerHTML = players.map(p => `<li>${p.name}: ${p.score}</li>`).join("");
+
+    // Disegno grafico top 5 paesi
+    const ctx = document.getElementById("resultsChart").getContext("2d");
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: topCountries.map(c => c.Country),
+        datasets: [{
+          label: "Esportazioni",
+          data: topCountries.map(c => c.Value)
+        }]
       }
-      if(countries.length !== numCountriesRequired) return alert("Compila tutti i campi!");
-      socket.emit("submitCountries", { roomId: currentRoomId, countries });
-    };
-
-    backHome.onclick = () => window.location.href = "/index.html";
-
-    socket.on("gameStarted", (settings) => {
-      numCountriesRequired = settings.numCountries;
-      gameArea.style.display = "block";
-      countriesInputsDiv.innerHTML = "";
-      for(let i=0;i<numCountriesRequired;i++){
-        const input = document.createElement("input");
-        input.setAttribute("id", `country${i}`);
-        input.setAttribute("list", "countriesList");
-        input.placeholder = `Paese ${i+1}`;
-        countriesInputsDiv.appendChild(input);
-      }
-      const datalist = document.createElement("datalist");
-      datalist.id = "countriesList";
-      allCountries.forEach(c => {
-        const option = document.createElement("option");
-        option.value = c;
-        datalist.appendChild(option);
-      });
-      countriesInputsDiv.appendChild(datalist);
     });
+  });
 
-    socket.on("countriesList", (countries) => {
-      allCountries = countries;
-    });
-
-    socket.on("gameEnded", ({ leaderboard, top5, product }) => {
-      resultsDiv.innerHTML = "<h4>Classifica:</h4>" +
-        leaderboard.map(p => `<div>${p.name} - ${p.score} punti</div>`).join("");
-      backHome.style.display = "inline-block";
-
-      const labels = top5.map(t => t.country);
-      const values = top5.map(t => t.value);
-
-      if(chartInstance) chartInstance.destroy();
-      const ctx = document.getElementById("chart").getContext("2d");
-      chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: { labels, datasets: [{ label: `Export ${product} (2023)`, data: values }] },
-        options: { responsive:true, plugins:{ legend:{ display:false } } }
-      });
-    });
-  </script>
+  // Messaggi di errore
+  socket.on("errorMsg", (msg) => {
+    alert(msg);
+  });
+</script>
 </body>
 </html>
