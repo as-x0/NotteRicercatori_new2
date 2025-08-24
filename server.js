@@ -17,25 +17,9 @@ fs.createReadStream("FAOSTAT_data_it.csv")
   .on("data", (row) => {
     productsData.push({
       Country: row["Area"],
-      .on("data", (row) => {
-        console.log("Riga letta dal CSV:", row); // DEBUG
-        productsData.push({ /* ... */ });
-      })
       ProductEN: row["Item"],
-      .on("data", (row) => {
-        console.log("Riga letta dal CSV:", row); // DEBUG
-        productsData.push({ /* ... */ });
-      })
       Year: parseInt(row["Year"]),
-      .on("data", (row) => {
-        console.log("Riga letta dal CSV:", row); // DEBUG
-        productsData.push({ /* ... */ });
-      })
       Value: parseFloat(row["Value"]) || 0
-      .on("data", (row) => {
-        console.log("Riga letta dal CSV:", row); // DEBUG
-        productsData.push({ /* ... */ });
-      })
     });
   })
   .on("end", () => {
