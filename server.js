@@ -3,39 +3,80 @@ import http from "http";
 import { Server } from "socket.io";
 import fs from "fs";
 import csv from "csv-parser";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static("public"));
+const PORT = process.env.PORT || 3000;
 
-// Caricamento CSV FAOSTAT
-let productsData = [];
-fs.createReadStream("FAOSTAT_data_it.csv")
-  .pipe(csv({ separator: "," }))
+// Servire file statici
+app.use(express.static(path.join(__dirname, "public")));
+
+// ======================
+// Lettura CSV
+// ======================
+const productsData = [];
+let csvLoaded = false;
+
+const csvPath = path.join(__dirname, "FAOSTAT_data_en_8-10-2025.csv");
+
+fs.createReadStream(csvPath)
+  .pipe(csv({ separator: ";" }))
   .on("data", (row) => {
-    productsData.push({
-      Country: row["Area"],
-      ProductEN: row["Item"],
-      Year: parseInt(row["Year"]),
-      Value: parseFloat(row["Value"]) || 0
-    });
+    // Salva solo righe valide
+    if (row["Item"] && row["Area"] && row["Year"] && row["Value"]) {
+      productsData.push({
+        Product: row["Item"],
+        Country: row["Area"],
+        Year: parseInt(row["Year"]),
+        Value: parseFloat(row["Value"]) || 0
+      });
+    }
   })
   .on("end", () => {
-    console.log("✅ CSV caricato, prodotti disponibili:", productsData.length);
+    csvLoaded = true;
+    console.log("✅ CSV caricato, righe:", productsData.length);
+  })
+  .on("error", (err) => {
+    console.error("Errore apertura CSV:", err);
   });
 
-// Stanze di gioco
-let rooms = {};
+// ======================
+// Endpoint API (opzionale)
+// ======================
+app.get("/api/products", (req, res) => {
+  const products = [...new Set(productsData.map(p => p.Product))];
+  res.json(products);
+});
+
+app.get("/api/countries", (req, res) => {
+  const countries = [...new Set(productsData.map(p => p.Country))];
+  res.json(countries);
+});
+
+app.get("/api/years", (req, res) => {
+  const years = [...new Set(productsData.map(p => p.Year))];
+  res.json(years);
+});
+
+// ======================
+// Gestione stanze
+// ======================
+const rooms = {};
 
 io.on("connection", (socket) => {
-  console.log("🔗 Nuovo client connesso:", socket.id);
+  console.log("Nuovo client connesso:", socket.id);
 
   // Creazione stanza
   socket.on("createRoom", () => {
-    if (productsData.length === 0) {
-      socket.emit("errorMsg", "⚠️ I dati non sono pronti, attendi qualche secondo.");
+    if (!csvLoaded) {
+      socket.emit("errorMsg", "⚠️ Dati non ancora pronti. Attendi qualche secondo.");
       return;
     }
 
@@ -44,108 +85,103 @@ io.on("connection", (socket) => {
     socket.join(roomId);
 
     const products = [...new Set(productsData.map(p => p.Product))].filter(Boolean);
+
     socket.emit("roomCreated", { roomId, products });
   });
 
-  // Salvataggio impostazioni
-  socket.on("setSettings", ({ roomId, product, year, numCountries }) => {
-    if (!rooms[roomId]) return;
-    rooms[roomId].settings = { product, year, numCountries };
-    io.to(roomId).emit("settingsUpdated", rooms[roomId].settings);
-  });
-
-  // Giocatore si unisce
+  // Join stanza
   socket.on("joinRoom", ({ roomId, name }) => {
-    if (!rooms[roomId]) {
-      socket.emit("errorMsg", "❌ Stanza inesistente");
+    const room = rooms[roomId];
+    if (!room) {
+      socket.emit("errorMsg", "Stanza non trovata");
       return;
     }
-
-    rooms[roomId].players.push({ id: socket.id, name, countries: [], score: 0 });
+    const player = { id: socket.id, name, countries: [], score: 0 };
+    room.players.push(player);
     socket.join(roomId);
-    io.to(roomId).emit("playerList", rooms[roomId].players);
+    io.to(roomId).emit("playerList", room.players);
   });
 
-  // Giocatore richiede lista paesi
-  socket.on("requestCountries", () => {
-    if (!productsData.length) return;
-    const countries = [...new Set(productsData.map(p => p.Country))].sort();
-    socket.emit("countryList", countries);
-  });
-
-  // Giocatore sceglie i paesi
-  socket.on("chooseCountries", ({ roomId, countries }) => {
-    const player = rooms[roomId]?.players.find(p => p.id === socket.id);
-    if (player) {
-      player.countries = countries;
-    }
-    io.to(roomId).emit("playerList", rooms[roomId].players);
-  });
-
-  // Avvio gioco
-  socket.on("startGame", (roomId) => {
+  // Imposta settaggi
+  socket.on("setSettings", ({ roomId, product, numCountries }) => {
     const room = rooms[roomId];
     if (!room) return;
+    room.settings = { product, year: 2023, numCountries };
 
-    if (!room.settings) {
-      socket.emit("errorMsg", "⚠️ Salva prima le impostazioni del gioco prima di avviarlo!");
-      return;
-    }
+    // Lista dei Paesi disponibili per il prodotto
+    const availableCountries = [
+      ...new Set(productsData.filter(p => p.Product === product && p.Year === 2023).map(p => p.Country))
+    ];
+    room.availableCountries = availableCountries;
 
+    io.to(roomId).emit("settingsUpdated", room.settings);
+    io.to(roomId).emit("countriesList", availableCountries);
+  });
+
+  // Avvio partita
+  socket.on("startGame", (roomId) => {
+    const room = rooms[roomId];
+    if (!room || !room.settings) return;
     room.started = true;
     io.to(roomId).emit("gameStarted", room.settings);
   });
 
-  // Fine gioco
-  socket.on("endGame", (roomId) => {
+  // Scelta Paesi da parte dei giocatori
+  socket.on("selectCountry", ({ roomId, country }) => {
     const room = rooms[roomId];
     if (!room) return;
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || !room.settings) return;
 
-    if (!room.settings) {
-      socket.emit("errorMsg", "⚠️ Salva prima le impostazioni del gioco prima di terminarlo!");
-      return;
+    // Limita al numero di Paesi scelto dal manager
+    if (player.countries.length < room.settings.numCountries && !player.countries.includes(country)) {
+      player.countries.push(country);
     }
+    io.to(roomId).emit("playerList", room.players);
+  });
+
+  // Fine partita
+  socket.on("endGame", (roomId) => {
+    const room = rooms[roomId];
+    if (!room || !room.settings) return;
 
     const { product, year } = room.settings;
 
-    // Calcolo punteggi
+    // Calcola punteggi
     room.players.forEach(player => {
       let score = 0;
-      player.countries.forEach(country => {
-        const record = productsData.find(r =>
-          r.Country === country && r.Product === product && r.Year === year
-        );
-        if (record) score += record.Value;
+      player.countries.forEach(c => {
+        const match = productsData.find(p => p.Product === product && p.Year === year && p.Country === c);
+        if (match) score += match.Value;
       });
-      player.score = Math.round(score);
+      player.score = score;
     });
 
-    room.players.sort((a, b) => b.score - a.score);
+    const leaderboard = [...room.players].sort((a,b)=>b.score - a.score);
 
-    // Top 5 paesi per grafico
-    const topCountries = productsData
-      .filter(r => r.Product === product && r.Year === year)
-      .sort((a, b) => b.Value - a.Value)
-      .slice(0, 5);
+    // Top Paesi per grafico
+    const topCountries = [...productsData]
+      .filter(p => p.Product === product && p.Year === year)
+      .sort((a,b)=>b.Value - a.Value)
+      .slice(0,5);
 
-    io.to(roomId).emit("gameEnded", {
-      players: room.players,
-      topCountries
-    });
+    io.to(roomId).emit("gameEnded", { players: leaderboard, topCountries });
   });
 
   // Disconnessione
   socket.on("disconnect", () => {
-    console.log("❌ Disconnesso:", socket.id);
+    console.log("Client disconnesso:", socket.id);
     for (const roomId in rooms) {
-      rooms[roomId].players = rooms[roomId].players.filter(p => p.id !== socket.id);
-      io.to(roomId).emit("playerList", rooms[roomId].players);
+      const room = rooms[roomId];
+      room.players = room.players.filter(p => p.id !== socket.id);
+      io.to(roomId).emit("playerList", room.players);
     }
   });
-
 });
 
-const PORT = process.env.PORT || 3000;
+// ======================
+// Avvio server
+// ======================
 server.listen(PORT, () => {
-  console.log(`🚀 Server attivo su http://localhost:${PORT}`);
+  console.log(`Server attivo su http://localhost:${PORT}`);
 });
