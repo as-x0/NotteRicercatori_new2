@@ -24,6 +24,15 @@ app.use(express.static(path.join(__dirname, "/public")));
 const productsData = [];
 const csvPath = path.join(__dirname, "FAOSTAT_data_en_8-10-2025.csv");
 
+// dizionario traduzioni prodotti (esempio base, estendilo con il tuo CSV reale)
+const productTranslations = {
+  "Coffee, green": "Caffè verde",
+  "Maize": "Mais",
+  "Rice, paddy": "Riso",
+  "Wheat": "Grano",
+  "Soybeans": "Soia"
+};
+
 fs.createReadStream(csvPath)
   .on("error", (err) => {
     console.error("Errore apertura CSV:", err);
@@ -32,6 +41,7 @@ fs.createReadStream(csvPath)
   .on("data", (row) => {
     productsData.push({
       Product: row["Item"],
+      ProductIT: productTranslations[row["Item"]] || row["Item"],
       Country: row["Area"],
       Year: row["Year"],
       Value: parseFloat(row["Value"]) || 0
@@ -45,18 +55,13 @@ fs.createReadStream(csvPath)
 // Endpoint API
 // ======================
 app.get("/api/products", (req, res) => {
-  const products = [...new Set(productsData.map((p) => p.Product))];
+  const products = [...new Set(productsData.map((p) => p.ProductIT))];
   res.json(products);
 });
 
 app.get("/api/countries", (req, res) => {
   const countries = [...new Set(productsData.map((p) => p.Country))];
   res.json(countries);
-});
-
-app.get("/api/years", (req, res) => {
-  const years = [...new Set(productsData.map((p) => p.Year))];
-  res.json(years);
 });
 
 // ======================
@@ -78,10 +83,9 @@ io.on("connection", (socket) => {
     };
     socket.join(roomId);
 
-    const products = [...new Set(productsData.map((p) => p.Product))];
-    const years = [...new Set(productsData.map((p) => p.Year))];
+    const products = [...new Set(productsData.map((p) => p.ProductIT))];
 
-    socket.emit("roomCreated", { roomId, products, years });
+    socket.emit("roomCreated", { roomId, products });
   });
 
   // Join stanza
@@ -99,17 +103,17 @@ io.on("connection", (socket) => {
   });
 
   // Imposta settaggi
-  socket.on("setSettings", ({ roomId, product, year, numCountries }) => {
+  socket.on("setSettings", ({ roomId, product, numCountries }) => {
     const room = rooms[roomId];
     if (!room) return;
 
-    room.settings = { product, year, numCountries };
+    room.settings = { product, year: 2023, numCountries };
     io.to(roomId).emit("settingsUpdated", room.settings);
 
     const availableCountries = [
       ...new Set(
         productsData
-          .filter((p) => p.Product === product && p.Year === year)
+          .filter((p) => p.ProductIT === product && p.Year === "2023")
           .map((p) => p.Country)
       )
     ];
@@ -125,17 +129,15 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("gameStarted", room.settings);
   });
 
-  // Scelta paese
-  socket.on("selectCountry", ({ roomId, country }) => {
+  // Scelta paesi (player invia array di paesi)
+  socket.on("submitCountries", ({ roomId, countries }) => {
     const room = rooms[roomId];
     if (!room) return;
 
     const player = room.players.find((p) => p.id === socket.id);
     if (!player) return;
 
-    if (!player.countries.includes(country)) {
-      player.countries.push(country);
-    }
+    player.countries = countries;
     io.to(roomId).emit("playerList", room.players);
   });
 
@@ -151,8 +153,8 @@ io.on("connection", (socket) => {
         player.countries.forEach((c) => {
           const match = productsData.find(
             (p) =>
-              p.Product === room.settings.product &&
-              p.Year === room.settings.year &&
+              p.ProductIT === room.settings.product &&
+              p.Year === "2023" &&
               p.Country === c
           );
           if (match) score += match.Value;
@@ -162,7 +164,21 @@ io.on("connection", (socket) => {
     }
 
     const leaderboard = [...room.players].sort((a, b) => b.score - a.score);
-    io.to(roomId).emit("gameEnded", leaderboard);
+
+    // calcola top5 paesi esportatori
+    const productRows = productsData.filter(
+      (p) => p.ProductIT === room.settings.product && p.Year === "2023"
+    );
+    const aggByCountry = {};
+    productRows.forEach((r) => {
+      aggByCountry[r.Country] = (aggByCountry[r.Country] || 0) + r.Value;
+    });
+    const top5 = Object.entries(aggByCountry)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([country, value]) => ({ country, value }));
+
+    io.to(roomId).emit("gameEnded", { leaderboard, top5, product: room.settings.product });
   });
 
   // Disconnessione
