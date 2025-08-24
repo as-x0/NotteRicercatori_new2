@@ -2,106 +2,117 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <title>Manager FAOSTAT Game</title>
+  <title>FAOSTAT Game - Manager</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1, h3 { color: #2c3e50; }
+    button { margin: 5px 0; padding: 5px 10px; }
+    select, input { margin: 5px 0; padding: 5px; }
+    #playerList li { margin-bottom: 3px; }
+  </style>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <h1>Manager</h1>
+  <button id="createRoom">Crea stanza</button>
 
-  <!-- Sezione creazione stanza -->
-  <div id="createSection">
-    <button id="createRoomBtn">Crea stanza</button>
-  </div>
-
-  <!-- Sezione impostazioni -->
-  <div id="roomSection" style="display:none;">
-    <p>ID Stanza: <span id="roomIdSpan"></span></p>
-
+  <div id="roomInfo" style="display:none;">
+    <p>ID Stanza: <span id="roomId"></span></p>
+    
     <h3>Impostazioni gioco</h3>
     <label>Prodotto:
       <select id="productSelect"></select>
-    </label>
+    </label><br>
     <p>Anno: 2023</p>
-    <label>Numero Paesi:</label>
+    
+    <label>Numero Paesi:</label><br>
     <input type="radio" name="numCountries" value="3" checked> 3
     <input type="radio" name="numCountries" value="5"> 5
-    <br><br>
-    <button id="saveSettingsBtn">Salva impostazioni</button>
-    <button id="startGameBtn">Avvia Gioco</button>
+    <br>
+    
+    <button id="saveSettings">Salva impostazioni</button>
+    <button id="startGame">Avvia Gioco</button>
+    <button id="endGame">Termina Gioco</button>
 
     <h3>Giocatori</h3>
     <ul id="playerList"></ul>
 
-    <button id="endGameBtn" style="margin-top:20px;">Termina Gioco</button>
-
     <h3>Risultati</h3>
-    <ul id="resultsList"></ul>
+    <div id="results"></div>
     <canvas id="resultsChart"></canvas>
-    <button onclick="window.location.reload()">Torna alla Home</button>
   </div>
 
-<script>
-  const socket = io();
-  const createRoomBtn = document.getElementById("createRoomBtn");
-  const roomSection = document.getElementById("roomSection");
-  const roomIdSpan = document.getElementById("roomIdSpan");
-  const productSelect = document.getElementById("productSelect");
-  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
-  const startGameBtn = document.getElementById("startGameBtn");
-  const playerList = document.getElementById("playerList");
-  const endGameBtn = document.getElementById("endGameBtn");
-  const resultsList = document.getElementById("resultsList");
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const socket = io();
 
-  let currentRoomId = null;
-  let settings = {};
+    const createBtn = document.getElementById("createRoom");
+    const roomInfo = document.getElementById("roomInfo");
+    const roomIdSpan = document.getElementById("roomId");
+    const productSelect = document.getElementById("productSelect");
+    const saveBtn = document.getElementById("saveSettings");
+    const startBtn = document.getElementById("startGame");
+    const endBtn = document.getElementById("endGame");
+    const playerList = document.getElementById("playerList");
+    const resultsDiv = document.getElementById("results");
+    const resultsChart = document.getElementById("resultsChart").getContext("2d");
 
-  createRoomBtn.addEventListener("click", () => {
-    socket.emit("createRoom");
-  });
+    let currentRoomId = null;
 
-  saveSettingsBtn.addEventListener("click", () => {
-    const product = productSelect.value;
-    const numCountries = parseInt(document.querySelector('input[name="numCountries"]:checked').value);
-    settings = { product, year: 2023, numCountries };
-    socket.emit("setSettings", { roomId: currentRoomId, ...settings });
-  });
+    createBtn.onclick = () => {
+      socket.emit("createRoom");
+    };
 
-  startGameBtn.addEventListener("click", () => {
-    socket.emit("startGame", currentRoomId);
-  });
+    saveBtn.onclick = () => {
+      const product = productSelect.value;
+      const numCountries = parseInt(document.querySelector('input[name="numCountries"]:checked').value);
+      socket.emit("setSettings", { roomId: currentRoomId, product, numCountries });
+      alert("Impostazioni salvate!");
+    };
 
-  endGameBtn.addEventListener("click", () => {
-    socket.emit("endGame", currentRoomId);
-  });
+    startBtn.onclick = () => {
+      socket.emit("startGame", currentRoomId);
+    };
 
-  socket.on("roomCreated", ({ roomId, products }) => {
-    currentRoomId = roomId;
-    roomIdSpan.textContent = roomId;
-    roomSection.style.display = "block";
-    productSelect.innerHTML = products.map(p => `<option value="${p}">${p}</option>`).join("");
-  });
+    endBtn.onclick = () => {
+      socket.emit("endGame", currentRoomId);
+    };
 
-  socket.on("playerList", (players) => {
-    playerList.innerHTML = players.map(p => `<li>${p.name} - ${p.countries.join(", ") || "Nessuna scelta"}</li>`).join("");
-  });
+    // Ricezione lista prodotti e creazione stanza
+    socket.on("roomCreated", ({ roomId, products }) => {
+      currentRoomId = roomId;
+      roomIdSpan.textContent = roomId;
+      roomInfo.style.display = "block";
 
-  socket.on("gameEnded", ({ players, topCountries }) => {
-    resultsList.innerHTML = players.map(p => `<li>${p.name}: ${p.score}</li>`).join("");
-    const ctx = document.getElementById("resultsChart").getContext("2d");
-    new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: topCountries.map(c => c.Country),
-        datasets: [{
-          label: `Esportazioni ${settings.product} 2023`,
-          data: topCountries.map(c => c.Value)
-        }]
-      }
+      // Popola la select dei prodotti
+      productSelect.innerHTML = products.map(p => `<option value="${p}">${p}</option>`).join("");
     });
-  });
 
-  socket.on("errorMsg", (msg) => alert(msg));
-</script>
+    // Aggiornamento lista giocatori
+    socket.on("playerList", (players) => {
+      playerList.innerHTML = players.map(p => `<li>${p.name} - ${p.countries.join(", ") || "Nessun paese scelto"}</li>`).join("");
+    });
+
+    // Visualizzazione risultati
+    socket.on("gameEnded", ({ players, topCountries }) => {
+      resultsDiv.innerHTML = "<h4>Classifica:</h4>" +
+        players.map(p => `<div>${p.name} - ${p.score}</div>`).join("");
+
+      new Chart(resultsChart, {
+        type: 'bar',
+        data: {
+          labels: topCountries.map(c => c.Country),
+          datasets: [{
+            label: 'Esportazioni',
+            data: topCountries.map(c => c.Value),
+            backgroundColor: 'rgba(54, 162, 235, 0.6)'
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+    });
+
+    socket.on("errorMsg", (msg) => alert(msg));
+  </script>
 </body>
 </html>
