@@ -10,32 +10,14 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
-// Traduzioni prodotti in italiano
-const productTranslations = {
-  "Wheat": "Grano",
-  "Rice": "Riso",
-  "Maize": "Mais",
-  "Soybeans": "Soia",
-  "Barley": "Orzo",
-  "Coffee": "Caffè",
-  "Cocoa": "Cacao",
-  "Sugar": "Zucchero",
-  "Cotton": "Cotone",
-  "Potatoes": "Patate",
-  "Tomatoes": "Pomodori",
-  "Apples": "Mele",
-  "Bananas": "Banane"
-};
-
 // Caricamento CSV FAOSTAT
 let productsData = [];
 fs.createReadStream("FAOSTAT_data_it.csv")
-  .pipe(csv())
+  .pipe(csv({ separator: "," }))
   .on("data", (row) => {
     productsData.push({
-      Country: row["Country"],
+      Country: row["Area"],
       ProductEN: row["Item"],
-      ProductIT: productTranslations[row["Item"]] || row["Item"],
       Year: parseInt(row["Year"]),
       Value: parseFloat(row["Value"]) || 0
     });
@@ -61,7 +43,7 @@ io.on("connection", (socket) => {
     rooms[roomId] = { manager: socket.id, players: [], settings: null, started: false };
     socket.join(roomId);
 
-    const products = [...new Set(productsData.map(p => p.ProductIT))].filter(Boolean);
+    const products = [...new Set(productsData.map(p => p.Product))].filter(Boolean);
     socket.emit("roomCreated", { roomId, products });
   });
 
@@ -131,7 +113,7 @@ io.on("connection", (socket) => {
       let score = 0;
       player.countries.forEach(country => {
         const record = productsData.find(r =>
-          r.Country === country && r.ProductIT === product && r.Year === year
+          r.Country === country && r.Product === product && r.Year === year
         );
         if (record) score += record.Value;
       });
@@ -142,7 +124,7 @@ io.on("connection", (socket) => {
 
     // Top 5 paesi per grafico
     const topCountries = productsData
-      .filter(r => r.ProductIT === product && r.Year === year)
+      .filter(r => r.Product === product && r.Year === year)
       .sort((a, b) => b.Value - a.Value)
       .slice(0, 5);
 
