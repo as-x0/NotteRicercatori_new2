@@ -76,6 +76,7 @@
   });
 
   socket.on("roomCreated", ({ roomId, products }) => {
+    console.log("Prodotti ricevuti dal server:", products);
     currentRoomId = roomId;
     roomIdSpan.textContent = roomId;
     roomSection.style.display = "block";
