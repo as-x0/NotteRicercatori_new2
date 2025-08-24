@@ -29,7 +29,7 @@ const productTranslations = {
 
 // --- Caricamento CSV FAOSTAT ---
 let productsData = [];
-fs.createReadStream("FAOSTAT_data_en_8-10-2025.csv")
+fs.createReadStream("FAOSTAT_data_it.csv")
   .pipe(csv())
   .on("data", (row) => {
     productsData.push({
