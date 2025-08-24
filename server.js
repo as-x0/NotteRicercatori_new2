@@ -29,13 +29,13 @@ const productTranslations = {
 
 // --- Caricamento CSV FAOSTAT ---
 let productsData = [];
-fs.createReadStream("FAOSTAT_data_en_8-10-2025.csv")
+fs.createReadStream("data/FAOSTAT_data.csv")
   .pipe(csv())
   .on("data", (row) => {
     productsData.push({
       Country: row["Country"],
       ProductEN: row["Item"],
-      ProductIT: productTranslations[row["Item"]] || row["Item"], // fallback se manca traduzione
+      ProductIT: productTranslations[row["Item"]] || row["Item"],
       Year: parseInt(row["Year"]),
       Value: parseFloat(row["Value"]) || 0
     });
@@ -84,6 +84,12 @@ io.on("connection", (socket) => {
     rooms[roomId].players.push({ id: socket.id, name, countries: [], score: 0 });
     socket.join(roomId);
     io.to(roomId).emit("playerList", rooms[roomId].players);
+  });
+
+  // Giocatore chiede lista paesi
+  socket.on("requestCountries", () => {
+    const countries = [...new Set(productsData.map(p => p.Country))].sort();
+    socket.emit("countryList", countries);
   });
 
   // Giocatore sceglie i paesi
@@ -145,7 +151,7 @@ io.on("connection", (socket) => {
 });
 
 // --- Avvio server ---
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 Server avviato su http://localhost:${PORT}`);
 });
