@@ -49,14 +49,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const resultsArea = document.getElementById("resultsArea");
   const resultsList = document.getElementById("resultsList");
-  const resultsChart = document.getElementById("resultsChart");
   const homeBtn = document.getElementById("homeBtn");
 
   let currentRoomId = null;
   let numCountries = 0;
   let availableCountries = [];
 
-  // Entra in stanza
   joinRoomBtn.addEventListener("click", () => {
     const name = playerNameInput.value.trim();
     const roomId = roomIdInput.value.trim();
@@ -66,18 +64,15 @@ document.addEventListener("DOMContentLoaded", () => {
     joinRoomBtn.disabled = true;
   });
 
-  // Riceve le impostazioni dal manager
   socket.on("settingsUpdated", (settings) => {
     numCountries = settings.numCountries;
   });
 
-  // Riceve lista Paesi disponibili
   socket.on("countriesList", (countries) => {
     availableCountries = countries;
     gameArea.style.display = "block";
     countriesForm.innerHTML = "";
 
-    // Crea campi input dinamici con autocompletamento
     let datalist = document.getElementById("countriesDatalist");
     if (!datalist) {
       datalist = document.createElement("datalist");
@@ -95,7 +90,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Invio Paesi scelti
   submitCountriesBtn.addEventListener("click", (e) => {
     e.preventDefault();
     const selectedCountries = Array.from(countriesForm.querySelectorAll("input"))
@@ -111,14 +105,15 @@ document.addEventListener("DOMContentLoaded", () => {
     submitCountriesBtn.disabled = true;
   });
 
-  // Fine partita: mostra risultati
-  socket.on("gameEnded", ({ leaderboard, topCountries, totalWorld, settings }) => {
+  // ✅ Fine partita
+  socket.on("gameEnded", ({ leaderboard }) => {
     gameArea.style.display = "none";
     resultsArea.style.display = "block";
 
     resultsList.innerHTML = leaderboard
       .map((p, i) => `<li>${i + 1}. <strong>${p.name}</strong> → ${p.score.toLocaleString()} t (${p.percentage.toFixed(2)}%)</li>`)
       .join("");
+  });
 
   socket.on("errorMsg", (msg) => alert(msg));
 
