@@ -10,27 +10,24 @@
     h1, h3 { color: #2c3e50; }
     button { margin: 5px 0; padding: 5px 10px; }
     input { margin: 3px 0; padding: 5px; width: 200px; }
-    #resultsList li { margin-bottom: 3px; }
+    #countriesForm input { display: block; }
   </style>
 </head>
 <body>
 <h1>Player</h1>
 
-<!-- Sezione join stanza -->
 <div id="joinSection">
   <label>Nome: <input type="text" id="playerName"></label><br>
   <label>Room ID: <input type="text" id="roomIdInput"></label><br>
   <button id="joinRoomBtn">Entra</button>
 </div>
 
-<!-- Sezione gioco -->
 <div id="gameArea" style="display:none;">
-  <h3 id="gameTitle">Scegli i Paesi</h3>
+  <h3>Scegli i Paesi</h3>
   <form id="countriesForm"></form>
   <button id="submitCountriesBtn">Invia Scelte</button>
 </div>
 
-<!-- Sezione risultati -->
 <div id="resultsArea" style="display:none;">
   <h3>Risultati</h3>
   <ul id="resultsList"></ul>
@@ -43,14 +40,14 @@
 document.addEventListener("DOMContentLoaded", () => {
   const socket = io();
 
-  // Elementi DOM
   const playerNameInput = document.getElementById("playerName");
   const roomIdInput = document.getElementById("roomIdInput");
   const joinRoomBtn = document.getElementById("joinRoomBtn");
+
   const gameArea = document.getElementById("gameArea");
-  const gameTitle = document.getElementById("gameTitle");
   const countriesForm = document.getElementById("countriesForm");
   const submitCountriesBtn = document.getElementById("submitCountriesBtn");
+
   const resultsArea = document.getElementById("resultsArea");
   const resultsList = document.getElementById("resultsList");
   const resultsChart = document.getElementById("resultsChart");
@@ -59,49 +56,29 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentRoomId = null;
   let numCountries = 0;
   let availableCountries = [];
-  let currentProduct = "";
 
-  // Join stanza
+  // Entra in stanza
   joinRoomBtn.addEventListener("click", () => {
     const name = playerNameInput.value.trim();
     const roomId = roomIdInput.value.trim();
     if (!name || !roomId) return alert("Inserisci nome e Room ID!");
     currentRoomId = roomId;
     socket.emit("joinRoom", { roomId, name });
+    joinRoomBtn.disabled = true;
   });
 
-  // Riceve impostazioni dal manager
+  // Riceve le impostazioni dal manager
   socket.on("settingsUpdated", (settings) => {
     numCountries = settings.numCountries;
-    currentProduct = settings.product;
   });
 
-  // Riceve lista dei Paesi disponibili
-  socket.on("countriesList", ({ countries, settings }) => {
+  // Riceve lista Paesi disponibili
+  socket.on("countriesList", (countries) => {
     availableCountries = countries;
-    numCountries = settings.numCountries;
-    currentProduct = settings.product;
-
-    // Mostra area gioco
     gameArea.style.display = "block";
-
-    // Aggiorna titolo dinamico
-    gameTitle.textContent = `Scegli i maggiori esportatori di ${currentProduct} del 2023`;
-
-    // Pulisce form
     countriesForm.innerHTML = "";
 
-    // Crea campi input dinamici
-    for (let i = 0; i < numCountries; i++) {
-      const input = document.createElement("input");
-      input.setAttribute("list", "countriesDatalist");
-      input.placeholder = `Paese ${i+1}`;
-      input.required = true;
-      countriesForm.appendChild(input);
-      countriesForm.appendChild(document.createElement("br"));
-    }
-
-    // Datalist per autocompletamento
+    // Crea campi input dinamici con autocompletamento
     let datalist = document.getElementById("countriesDatalist");
     if (!datalist) {
       datalist = document.createElement("datalist");
@@ -109,6 +86,14 @@ document.addEventListener("DOMContentLoaded", () => {
       document.body.appendChild(datalist);
     }
     datalist.innerHTML = countries.map(c => `<option value="${c}">`).join("");
+
+    for (let i = 0; i < numCountries; i++) {
+      const input = document.createElement("input");
+      input.setAttribute("list", "countriesDatalist");
+      input.placeholder = `Paese ${i+1}`;
+      input.required = true;
+      countriesForm.appendChild(input);
+    }
   });
 
   // Invio Paesi scelti
@@ -124,15 +109,16 @@ document.addEventListener("DOMContentLoaded", () => {
       socket.emit("selectCountry", { roomId: currentRoomId, country: c });
     });
     alert("Scelte inviate!");
+    submitCountriesBtn.disabled = true;
   });
 
-  // Riceve risultati e crea grafico
-  socket.on("gameEnded", ({ players, topCountries, settings }) => {
+  // Fine partita: mostra risultati e grafico
+  socket.on("gameEnded", ({ leaderboard, topCountries, totalWorld, settings }) => {
     gameArea.style.display = "none";
     resultsArea.style.display = "block";
 
-    resultsList.innerHTML = players
-      .map(p => `<li>${p.name}: ${p.score.toLocaleString()} t (${p.percentage.toFixed(2)}%)</li>`)
+    resultsList.innerHTML = leaderboard
+      .map((p, i) => `<li>${i + 1}. <strong>${p.name}</strong> → ${p.score.toLocaleString()} t (${p.percentage.toFixed(2)}%)</li>`)
       .join("");
 
     const ctx = resultsChart.getContext("2d");
@@ -150,7 +136,10 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       options: {
         responsive: true,
-        plugins: { title: { display: true, text: `Totale mondiale: ${settings.totalWorld?.toLocaleString() || "?"} t` } },
+        plugins: {
+          title: { display: true, text: `Totale mondiale: ${totalWorld.toLocaleString()} t` },
+          legend: { display: false }
+        },
         scales: { y: { beginAtZero: true } }
       }
     });
