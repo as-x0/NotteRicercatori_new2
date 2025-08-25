@@ -79,10 +79,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   startGameBtn.addEventListener("click", () => {
     socket.emit("startGame", currentRoomId);
+    alert("Il gioco è stato avviato!");
   });
 
   endGameBtn.addEventListener("click", () => {
     socket.emit("endGame", currentRoomId);
+    alert("Il gioco è terminato!");
   });
 
   socket.on("roomCreated", ({ roomId, products }) => {
