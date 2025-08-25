@@ -144,51 +144,59 @@ io.on("connection", (socket) => {
   socket.on("endGame", (roomId) => {
     const room = rooms[roomId];
     if (!room || !room.settings) return;
-
+  
     const { product, year } = room.settings;
-
+  
+    // 🔹 Debug (facoltativo)
     console.log("Prodotto selezionato dal manager:", product);
-    console.log("Prodotti disponibili nel CSV:", [...new Set(productsData.map(p => p.Item))]);
-
-    // Filtra i dati del CSV per prodotto + anno
+    console.log("Prodotti disponibili nel CSV:", [...new Set(productsData.map(p => p.Product))]);
+  
+    // Filtra i dati del CSV per prodotto + anno (case insensitive e trim)
     const filtered = productsData.filter(
       (row) =>
-        row.Item.trim().toLowerCase() === product.trim().toLowerCase() &&
-        row.Year === 2023  // se l'anno è fisso
+        row.Product.trim().toLowerCase() === product.trim().toLowerCase() &&
+        row.Year === 2023 // anno fisso
     );
   
     if (!filtered.length) {
       socket.emit("errorMsg", "Nessun dato trovato per questo prodotto/anno!");
       return;
     }
-    
+  
     // Totale mondiale
     const totalWorld = filtered.reduce((acc, r) => acc + r.Value, 0);
-    
+  
     // Punteggi giocatori
     room.players.forEach((player) => {
       let total = 0;
       player.countries.forEach((country) => {
         const match = filtered.find(
-          (row) => row.Area.toLowerCase() === country.toLowerCase()   // 👈 colonna corretta
+          (row) => row.Country.trim().toLowerCase() === country.trim().toLowerCase()
         );
         if (match) total += match.Value;
       });
       player.score = total;
       player.percentage = totalWorld > 0 ? (total / totalWorld) * 100 : 0;
     });
-    
+  
     const leaderboard = [...room.players].sort((a, b) => b.score - a.score);
-    
+  
     // Top Paesi per grafico
     const topCountries = filtered
       .sort((a, b) => b.Value - a.Value)
       .slice(0, 5)
       .map((row) => ({
-        Country: row.Area,  // 👈 uso Area per il nome del Paese
+        Country: row.Country,
         Value: row.Value,
         Percent: totalWorld > 0 ? (row.Value / totalWorld) * 100 : 0,
       }));
+  
+    // Invia i risultati al client
+    io.to(roomId).emit("gameEnded", {
+      leaderboard,
+      topCountries,
+      totalWorld,
+    });
   });
 
   // Disconnessione
