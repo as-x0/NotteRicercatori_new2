@@ -150,8 +150,8 @@ io.on("connection", (socket) => {
   // Filtra i dati del CSV per prodotto + anno
   const filtered = productsData.filter(
     (row) =>
-      row.Item === product &&   // 👈 colonna corretta
-      row.Year === year
+      row.Item.trim().toLowerCase() === product.trim().toLowerCase() &&
+      row.Year === 2023  // se l'anno è fisso
   );
   
   if (!filtered.length) {
