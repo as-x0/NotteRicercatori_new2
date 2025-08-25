@@ -186,11 +186,11 @@ io.on("connection", (socket) => {
       .sort((a, b) => b.Value - a.Value)
       .slice(0, 5)
       .map((row) => ({
-        Country: row.Country,
-        Value: row.Value,
-        Percent: totalWorld > 0 ? (row.Value / totalWorld) * 100 : 0,
+        Country: row.Country.trim(),
+        Value: Number(row.Value) || 0,
+        Percent: totalWorld > 0 ? (Number(row.Value) / totalWorld) * 100 : 0,
       }));
-  
+
     // Invia i risultati al client
     io.to(roomId).emit("gameEnded", {
       leaderboard,
