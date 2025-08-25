@@ -149,11 +149,9 @@ io.on("connection", (socket) => {
 
   // Filtra i dati del CSV per prodotto + anno
   const filtered = productsData.filter(
-    (row) =>
-      row.Item.trim().toLowerCase() === product.trim().toLowerCase() &&
-      row.Year === 2023  // se l'anno è fisso
+    (row) => row.Item === product && row.Year === year
   );
-  
+
   if (!filtered.length) {
     socket.emit("errorMsg", "Nessun dato trovato per questo prodotto/anno!");
     return;
