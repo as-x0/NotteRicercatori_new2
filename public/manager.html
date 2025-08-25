@@ -106,20 +106,34 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Risultati e grafico
-  socket.on("gameEnded", ({ players, topCountries }) => {
-    resultsList.innerHTML = players.map(p => `<li>${p.name}: ${p.score}</li>`).join("");
+  socket.on("gameEnded", ({ leaderboard, topCountries, totalWorld }) => {
+    resultsList.innerHTML = leaderboard
+      .map(
+        (p, i) =>
+          `<li>${i + 1}. <strong>${p.name}</strong> → ${p.score.toLocaleString()} t (${p.percentage.toFixed(2)}%)</li>`
+      )
+      .join("");
+  
     const ctx = document.getElementById("resultsChart").getContext("2d");
     new Chart(ctx, {
       type: "bar",
       data: {
-        labels: topCountries.map(c => c.Country),
-        datasets: [{
-          label: `Esportazioni ${settings.product} 2023`,
-          data: topCountries.map(c => c.Value),
-          backgroundColor: 'rgba(54, 162, 235, 0.6)'
-        }]
+        labels: topCountries.map((c) => c.Country),
+        datasets: [
+          {
+            label: `Top 5 reale (${leaderboard[0]?.name || ""} ha scelto ${leaderboard[0]?.countries?.join(", ")})`,
+            data: topCountries.map((c) => c.Value),
+          },
+        ],
       },
-      options: { responsive: true, plugins: { legend: { display: false } } }
+      options: {
+        plugins: {
+          title: {
+            display: true,
+            text: `Totale mondiale: ${totalWorld.toLocaleString()} t`,
+          },
+        },
+      },
     });
   });
 
