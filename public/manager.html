@@ -85,7 +85,6 @@ document.addEventListener("DOMContentLoaded", () => {
     socket.emit("endGame", currentRoomId);
   });
 
-  // Evento stanza creata
   socket.on("roomCreated", ({ roomId, products }) => {
     console.log("RoomCreated ricevuto:", roomId, products); // DEBUG
     currentRoomId = roomId;
@@ -100,12 +99,10 @@ document.addEventListener("DOMContentLoaded", () => {
     productSelect.innerHTML = products.map(p => `<option value="${p}">${p}</option>`).join("");
   });
 
-  // Lista giocatori aggiornata
   socket.on("playerList", (players) => {
     playerList.innerHTML = players.map(p => `<li>${p.name} - ${p.countries.join(", ") || "Nessuna scelta"}</li>`).join("");
   });
 
-  // Risultati e grafico
   socket.on("gameEnded", ({ leaderboard, topCountries, totalWorld }) => {
     resultsList.innerHTML = leaderboard
       .map(
@@ -121,7 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
       data: {
         labels: topCountries.map((c) => c.Country),
         datasets: [{
-          label: `Esportazioni ${product} 2023`,
+          label: `Esportazioni ${settings.product} 2023`,
           data: topCountries.map((c) => c.Value),
           backgroundColor: 'rgba(54, 162, 235, 0.6)',
           borderColor: 'rgba(54, 162, 235, 1)',
@@ -138,7 +135,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     });
+  });
 
+  // Eventi globali fuori dai singoli callback
   socket.on("errorMsg", (msg) => alert(msg));
 });
 </script>
