@@ -148,51 +148,44 @@ io.on("connection", (socket) => {
     const { product, year } = room.settings;
 
   // Filtra i dati del CSV per prodotto + anno
-    const filtered = productsData.filter(
-      (row) =>
-        row.Product === product &&
-        row.Year === year
-    );
-
-    if (!filtered.length) {
-      socket.emit("errorMsg", "Nessun dato trovato per questo prodotto/anno!");
-      return;
-    }
-
-    // Totale mondiale
-    const totalWorld = filtered.reduce((acc, r) => acc + r.Value, 0);
-
-    // Punteggi giocatori
-    room.players.forEach((player) => {
-      let total = 0;
-      player.countries.forEach((country) => {
-        const match = filtered.find(
-          (row) => row.Country.toLowerCase() === country.toLowerCase()
-        );
-        if (match) total += match.Value;
-      });
-      player.score = total;
-      player.percentage = totalWorld > 0 ? (total / totalWorld) * 100 : 0;
+  const filtered = productsData.filter(
+    (row) =>
+      row.Item === product &&   // 👈 colonna corretta
+      row.Year === year
+  );
+  
+  if (!filtered.length) {
+    socket.emit("errorMsg", "Nessun dato trovato per questo prodotto/anno!");
+    return;
+  }
+  
+  // Totale mondiale
+  const totalWorld = filtered.reduce((acc, r) => acc + r.Value, 0);
+  
+  // Punteggi giocatori
+  room.players.forEach((player) => {
+    let total = 0;
+    player.countries.forEach((country) => {
+      const match = filtered.find(
+        (row) => row.Area.toLowerCase() === country.toLowerCase()   // 👈 colonna corretta
+      );
+      if (match) total += match.Value;
     });
-
-    const leaderboard = [...room.players].sort((a,b)=>b.score - a.score);
-
-    // Top Paesi per grafico
-    const topCountries = filtered
-      .sort((a,b)=>b.Value - a.Value)
-      .slice(0,5)
-      .map((row) => ({
-        Country: row.Area,
-        Value: row.Value,
-        Percent: totalWorld > 0 ? (row.Value / totalWorld) * 100 : 0,
-      }));
-
-      io.to(roomId).emit("gameEnded", {
-        leaderboard,
-        topCountries,
-        totalWorld,
-      });
+    player.score = total;
+    player.percentage = totalWorld > 0 ? (total / totalWorld) * 100 : 0;
   });
+  
+  const leaderboard = [...room.players].sort((a, b) => b.score - a.score);
+  
+  // Top Paesi per grafico
+  const topCountries = filtered
+    .sort((a, b) => b.Value - a.Value)
+    .slice(0, 5)
+    .map((row) => ({
+      Country: row.Area,  // 👈 uso Area per il nome del Paese
+      Value: row.Value,
+      Percent: totalWorld > 0 ? (row.Value / totalWorld) * 100 : 0,
+    }));
 
   // Disconnessione
   socket.on("disconnect", () => {
