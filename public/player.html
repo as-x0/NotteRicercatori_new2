@@ -4,28 +4,33 @@
   <meta charset="UTF-8">
   <title>Player FAOSTAT Game</title>
   <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1, h3 { color: #2c3e50; }
     button { margin: 5px 0; padding: 5px 10px; }
     input { margin: 3px 0; padding: 5px; width: 200px; }
+    #resultsList li { margin-bottom: 3px; }
   </style>
 </head>
 <body>
 <h1>Player</h1>
 
+<!-- Sezione join stanza -->
 <div id="joinSection">
   <label>Nome: <input type="text" id="playerName"></label><br>
   <label>Room ID: <input type="text" id="roomIdInput"></label><br>
   <button id="joinRoomBtn">Entra</button>
 </div>
 
+<!-- Sezione gioco -->
 <div id="gameArea" style="display:none;">
-  <h3>Scegli i Paesi</h3>
+  <h3 id="gameTitle">Scegli i Paesi</h3>
   <form id="countriesForm"></form>
   <button id="submitCountriesBtn">Invia Scelte</button>
 </div>
 
+<!-- Sezione risultati -->
 <div id="resultsArea" style="display:none;">
   <h3>Risultati</h3>
   <ul id="resultsList"></ul>
@@ -34,19 +39,18 @@
   <button id="homeBtn">Torna alla Home</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const socket = io();
 
+  // Elementi DOM
   const playerNameInput = document.getElementById("playerName");
   const roomIdInput = document.getElementById("roomIdInput");
   const joinRoomBtn = document.getElementById("joinRoomBtn");
-
   const gameArea = document.getElementById("gameArea");
+  const gameTitle = document.getElementById("gameTitle");
   const countriesForm = document.getElementById("countriesForm");
   const submitCountriesBtn = document.getElementById("submitCountriesBtn");
-
   const resultsArea = document.getElementById("resultsArea");
   const resultsList = document.getElementById("resultsList");
   const resultsChart = document.getElementById("resultsChart");
@@ -55,8 +59,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentRoomId = null;
   let numCountries = 0;
   let availableCountries = [];
+  let currentProduct = "";
 
-  // Entra in stanza
+  // Join stanza
   joinRoomBtn.addEventListener("click", () => {
     const name = playerNameInput.value.trim();
     const roomId = roomIdInput.value.trim();
@@ -65,15 +70,23 @@ document.addEventListener("DOMContentLoaded", () => {
     socket.emit("joinRoom", { roomId, name });
   });
 
-  // Riceve le impostazioni dal manager
+  // Riceve impostazioni dal manager
   socket.on("settingsUpdated", (settings) => {
     numCountries = settings.numCountries;
+    currentProduct = settings.product;
   });
 
-  // Riceve la lista dei Paesi disponibili
-  socket.on("countriesList", (countries) => {
+  // Riceve lista dei Paesi disponibili
+  socket.on("countriesList", ({ countries, settings }) => {
     availableCountries = countries;
+    numCountries = settings.numCountries;
+    currentProduct = settings.product;
+
+    // Mostra area gioco
     gameArea.style.display = "block";
+
+    // Aggiorna titolo dinamico
+    gameTitle.textContent = `Scegli i maggiori esportatori di ${currentProduct} del 2023`;
 
     // Pulisce form
     countriesForm.innerHTML = "";
@@ -113,12 +126,14 @@ document.addEventListener("DOMContentLoaded", () => {
     alert("Scelte inviate!");
   });
 
-  // Fine partita: mostra risultati e grafico
+  // Riceve risultati e crea grafico
   socket.on("gameEnded", ({ players, topCountries, settings }) => {
     gameArea.style.display = "none";
     resultsArea.style.display = "block";
 
-    resultsList.innerHTML = players.map(p => `<li>${p.name}: ${p.score}</li>`).join("");
+    resultsList.innerHTML = players
+      .map(p => `<li>${p.name}: ${p.score.toLocaleString()} t (${p.percentage.toFixed(2)}%)</li>`)
+      .join("");
 
     const ctx = resultsChart.getContext("2d");
     new Chart(ctx, {
@@ -128,17 +143,23 @@ document.addEventListener("DOMContentLoaded", () => {
         datasets: [{
           label: `Esportazioni ${settings.product} 2023`,
           data: topCountries.map(c => c.Value),
-          backgroundColor: 'rgba(54, 162, 235, 0.6)'
+          backgroundColor: 'rgba(54, 162, 235, 0.6)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1
         }]
       },
-      options: { responsive: true, plugins: { legend: { display: false } } }
+      options: {
+        responsive: true,
+        plugins: { title: { display: true, text: `Totale mondiale: ${settings.totalWorld?.toLocaleString() || "?"} t` } },
+        scales: { y: { beginAtZero: true } }
+      }
     });
   });
 
   socket.on("errorMsg", (msg) => alert(msg));
 
   homeBtn.addEventListener("click", () => {
-    window.location.href = "player.html";
+    window.location.reload();
   });
 });
 </script>
