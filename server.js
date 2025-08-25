@@ -147,45 +147,48 @@ io.on("connection", (socket) => {
 
     const { product, year } = room.settings;
 
-  // Filtra i dati del CSV per prodotto + anno
-  const filtered = productsData.filter(
-    (row) =>
-      row.Item.trim().toLowerCase() === product.trim().toLowerCase() &&
-      row.Year === 2023  // se l'anno è fisso
-  );
+    console.log("Prodotto selezionato dal manager:", product);
+    console.log("Prodotti disponibili nel CSV:", [...new Set(productsData.map(p => p.Item))]);
 
-  if (!filtered.length) {
-    socket.emit("errorMsg", "Nessun dato trovato per questo prodotto/anno!");
-    return;
-  }
+    // Filtra i dati del CSV per prodotto + anno
+    const filtered = productsData.filter(
+      (row) =>
+        row.Item.trim().toLowerCase() === product.trim().toLowerCase() &&
+        row.Year === 2023  // se l'anno è fisso
+    );
   
-  // Totale mondiale
-  const totalWorld = filtered.reduce((acc, r) => acc + r.Value, 0);
-  
-  // Punteggi giocatori
-  room.players.forEach((player) => {
-    let total = 0;
-    player.countries.forEach((country) => {
-      const match = filtered.find(
-        (row) => row.Area.toLowerCase() === country.toLowerCase()   // 👈 colonna corretta
-      );
-      if (match) total += match.Value;
+    if (!filtered.length) {
+      socket.emit("errorMsg", "Nessun dato trovato per questo prodotto/anno!");
+      return;
+    }
+    
+    // Totale mondiale
+    const totalWorld = filtered.reduce((acc, r) => acc + r.Value, 0);
+    
+    // Punteggi giocatori
+    room.players.forEach((player) => {
+      let total = 0;
+      player.countries.forEach((country) => {
+        const match = filtered.find(
+          (row) => row.Area.toLowerCase() === country.toLowerCase()   // 👈 colonna corretta
+        );
+        if (match) total += match.Value;
+      });
+      player.score = total;
+      player.percentage = totalWorld > 0 ? (total / totalWorld) * 100 : 0;
     });
-    player.score = total;
-    player.percentage = totalWorld > 0 ? (total / totalWorld) * 100 : 0;
-  });
-  
-  const leaderboard = [...room.players].sort((a, b) => b.score - a.score);
-  
-  // Top Paesi per grafico
-  const topCountries = filtered
-    .sort((a, b) => b.Value - a.Value)
-    .slice(0, 5)
-    .map((row) => ({
-      Country: row.Area,  // 👈 uso Area per il nome del Paese
-      Value: row.Value,
-      Percent: totalWorld > 0 ? (row.Value / totalWorld) * 100 : 0,
-    }));
+    
+    const leaderboard = [...room.players].sort((a, b) => b.score - a.score);
+    
+    // Top Paesi per grafico
+    const topCountries = filtered
+      .sort((a, b) => b.Value - a.Value)
+      .slice(0, 5)
+      .map((row) => ({
+        Country: row.Area,  // 👈 uso Area per il nome del Paese
+        Value: row.Value,
+        Percent: totalWorld > 0 ? (row.Value / totalWorld) * 100 : 0,
+      }));
   });
 
   // Disconnessione
