@@ -186,6 +186,7 @@ io.on("connection", (socket) => {
       Value: row.Value,
       Percent: totalWorld > 0 ? (row.Value / totalWorld) * 100 : 0,
     }));
+  });
 
   // Disconnessione
   socket.on("disconnect", () => {
