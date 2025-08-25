@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Quando ricevi le impostazioni dal manager
   socket.on("settingsUpdated", (settings) => {
     numCountries = settings.numCountries;
-    chooseCountriesHeader.textContent = `Scegli i maggiori esportatori di ${settings.product} nel ${settings.year}`;
+    chooseCountriesHeader.textContent = `Scegli i maggiori esportatori di ${settings.product.toLowerCase()} nel ${settings.year}`;
   });
 
   joinRoomBtn.addEventListener("click", () => {
