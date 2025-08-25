@@ -119,24 +119,25 @@ document.addEventListener("DOMContentLoaded", () => {
     new Chart(ctx, {
       type: "bar",
       data: {
-        labels: topCountries.map((c) => c.Area),
-        datasets: [
-          {
-            label: `Top 5 reale`,
-            data: topCountries.map((c) => c.Value),
-          },
-        ],
+        labels: topCountries.map((c) => c.Country),
+        datasets: [{
+          label: `Esportazioni ${product} 2023`,
+          data: topCountries.map((c) => c.Value),
+          backgroundColor: 'rgba(54, 162, 235, 0.6)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1
+        }]
       },
       options: {
+        responsive: true,
         plugins: {
-          title: {
-            display: true,
-            text: `Totale mondiale: ${totalWorld.toLocaleString()} t`,
-          },
+          title: { display: true, text: `Totale mondiale: ${totalWorld.toLocaleString()} t` },
         },
-      },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
     });
-  });
 
   socket.on("errorMsg", (msg) => alert(msg));
 });
