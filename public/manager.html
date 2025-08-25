@@ -115,13 +115,8 @@ document.addEventListener("DOMContentLoaded", () => {
       .join("");
   
     const ctx = document.getElementById("resultsChart").getContext("2d");
-
-    // Evita conflitti se il grafico esiste già
-    if (window.resultsChart) {
-      window.resultsChart.destroy();
-    }
     
-    window.resultsChart = new Chart(ctx, {
+    new Chart(ctx, {
       type: "bar",
       data: {
         labels: topCountries.map((c) => c.Area),
