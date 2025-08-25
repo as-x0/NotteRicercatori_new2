@@ -180,9 +180,9 @@ io.on("connection", (socket) => {
     // Top Paesi per grafico
     const topCountries = filtered
       .sort((a,b)=>b.Value - a.Value)
-      .slice(0,5);
+      .slice(0,5)
       .map((row) => ({
-        Country: row.Country,
+        Country: row.Area,
         Value: row.Value,
         Percent: totalWorld > 0 ? (row.Value / totalWorld) * 100 : 0,
       }));
