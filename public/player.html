@@ -70,6 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
     currentRoomId = roomId;
     socket.emit("joinRoom", { roomId, name });
     joinRoomBtn.disabled = true;
+    alert(`Sei entrato nella stanza ${roomId} come ${name}!  Attendi che la partita venga avviata...`)
   });
 
   socket.on("settingsUpdated", (settings) => {
