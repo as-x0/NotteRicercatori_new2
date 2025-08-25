@@ -23,7 +23,7 @@
 </div>
 
 <div id="gameArea" style="display:none;">
-  <h3>Scegli i Paesi</h3>
+  <h3 id="chooseCountriesHeader">Scegli i Paesi</h3>
   <form id="countriesForm"></form>
   <button id="submitCountriesBtn">Invia Scelte</button>
 </div>
@@ -47,6 +47,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const countriesForm = document.getElementById("countriesForm");
   const submitCountriesBtn = document.getElementById("submitCountriesBtn");
 
+  const chooseCountriesHeader = document.getElementById("chooseCountriesHeader");
+
   const resultsArea = document.getElementById("resultsArea");
   const resultsList = document.getElementById("resultsList");
   const homeBtn = document.getElementById("homeBtn");
@@ -54,6 +56,12 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentRoomId = null;
   let numCountries = 0;
   let availableCountries = [];
+
+  // Quando ricevi le impostazioni dal manager
+  socket.on("settingsUpdated", (settings) => {
+    numCountries = settings.numCountries;
+    chooseCountriesHeader.textContent = `Scegli i maggiori esportatori di ${settings.product} nel ${settings.year}`;
+  });
 
   joinRoomBtn.addEventListener("click", () => {
     const name = playerNameInput.value.trim();
